@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(robot_test)
+project(kangaroo_driver)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -105,14 +105,14 @@ include_directories( include
 
 ## Declare a cpp executable
 # add_executable(robot_test_node src/robot_test_node.cpp )
-add_executable(robot_test_node src/robot_test_node.cpp src/robot_test.cpp)
+add_executable(kangaroo_driver_node src/kangaroo_driver_node.cpp src/kangaroo_driver.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(robot_test_node robot_test_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(robot_test_node
+target_link_libraries(kangaroo_driver_node
   ${catkin_LIBRARIES}
 )
 
@@ -132,7 +132,7 @@ target_link_libraries(robot_test_node
 
 ## Mark executables and/or libraries for installation
 # install(TARGETS robot_test robot_test_node
-install(TARGETS robot_test_node
+install(TARGETS kangaroo_driver_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

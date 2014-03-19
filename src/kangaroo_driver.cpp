@@ -1,4 +1,4 @@
-#include "robot_test/robot_test.hpp"
+#include "kangaroo_driver/kangaroo_driver.hpp"
 
 #include <cstdlib>
 #include <cerrno>
@@ -68,7 +68,7 @@ bool kangaroo::open( )
 	}
 	fd_options.c_cflag &= ~HUPCL;
 	fd_options.c_lflag &= ~ICANON;
-	fd_options.c_cc[VTIME] = 2;
+	fd_options.c_cc[VTIME] = 1;
 	fd_options.c_cc[VMIN] = 0;
 	if( 0 > tcsetattr( fd, TCSANOW, &fd_options ) )
 	{
