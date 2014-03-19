@@ -35,8 +35,8 @@ int main( int argc, char *argv[] )
 	if( !qik->start( ) )
 		ROS_ERROR( "Failed to start the driver" );
 
-	if( !qik->send_start_signals(128))
-		ROS_ERROR( "Failed to send the start signals.");
+	//if( !qik->send_start_signals(128))
+	//	ROS_ERROR( "Failed to send the start signals.");
 
 	ros::spin( );
 

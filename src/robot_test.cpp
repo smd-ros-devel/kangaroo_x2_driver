@@ -97,12 +97,14 @@ bool kangaroo::start( )
 		joint_traj_sub = nh.subscribe( "joint_trajectory", 1, &kangaroo::JointTrajCB, this );
 
 
+	send_start_signals((uint8_t)128);
+
 	return true;
 }
 
 bool kangaroo::send_start_signals(uint8_t address)
 {
-	uint8_t buffer[18];
+	uint8_t buffer[7];
 	int num_of_bytes_1 = writeKangarooStartCommand(address, '1', buffer);
         if( 0 > write( fd, buffer, num_of_bytes_1 ) )
         {
@@ -171,7 +173,7 @@ void kangaroo::JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg )
 	ROS_WARN( "Got a valid JointTrajectory message" );
 
 	set_ch1( msg->points[0].velocities[ch1_idx], 128);
-	//set_ch2( msg->points[0].velocities[ch2_idx], 128 );
+	set_ch2( msg->points[0].velocities[ch2_idx], 128 );
 
 	//get_speed(128);	
 }
@@ -186,7 +188,7 @@ bool kangaroo::set_ch1( double speed, unsigned char address = 128 )
 
 	uint8_t buffer[18];
 
-	speed *= 1000;
+	//speed *= 1000;
 
 	//Send
 	int num_of_bytes = writeKangarooSpeedCommand(address, '1', speed, buffer);
@@ -208,7 +210,7 @@ bool kangaroo::set_ch2( double speed, unsigned char address = 128 )
 		return false;
 
 	uint8_t buffer[18];
-	speed *= 1000;
+	//speed *= 1000;
 
 	//Send
 	int num_of_bytes = writeKangarooSpeedCommand(address, '2', speed, buffer);
@@ -275,12 +277,11 @@ size_t kangaroo::bitpackNumber(uint8_t* buffer, int32_t number)
  * \return The CRC. */
 uint16_t kangaroo::crc14( const uint8_t* data, size_t length)
 {
-	uint16_t crc = 0x3fff; 
-	size_t i, bit;
-	for(i = 0; i < length; i ++)
+	uint16_t crc = 0x3fff;
+	for(size_t i = 0; i < length; i ++)
 	{
 		crc ^= data[i] & 0x7f;
-		for(bit = 0; bit < 7; bit ++)
+		for(size_t bit = 0; bit < 7; bit ++)
 		{
 			if(crc & 1) 
 			{ 
@@ -302,19 +303,29 @@ uint16_t kangaroo::crc14( const uint8_t* data, size_t length)
 \param buffer The buffer to write into.
 \return How many bytes were written. This always equals 4 + length. */
 size_t kangaroo::writeKangarooCommand( uint8_t address, uint8_t command, const uint8_t* data, uint8_t length, uint8_t* buffer)
-{
-	size_t i; 
+{ 
 	uint16_t crc;
 	buffer[0] = address; 
 	buffer[1] = command;
-	for(i = 0; i < length; i ++) 
+	buffer[2] = length;
+	for(size_t i = 0; i < length; i ++) 
 	{ 
-		buffer[2 + i] = data[i]; 
+		buffer[3 + i] = data[i]; 
 	}
-	crc = crc14(data, 2 + length);
-	buffer[2 + length] = crc & 0x7f;
-	buffer[3 + length] = (crc >> 7) & 0x7f;
-	return 4 + length;
+	//crc = crc14(data, 3 + length);
+	crc = crc14(buffer, length + 3);
+	buffer[3 + length] = crc & 0x7f;
+	buffer[4 + length] = (crc >> 7) & 0x7f;
+
+	//std::cout << "Address: " << (int)address << ", command: " << (int)command << ", length: " << (int)length << std::endl;
+	//std::cout << "CRC: " <<  (int)crc << ", Total length: " << 5 + (int)length << std::endl;
+	
+	//for(int i = 0; i < 5 + length; i++)
+	//{
+	//	std::cout << i << ": " << (int)buffer[i] << ", ";
+	//}
+	//std::cout << std::endl;
+	return 5 + length;
 }
 
 /*! Writes a Move command for Position into a buffer.
@@ -332,9 +343,12 @@ size_t kangaroo::writeKangarooPositionCommand(uint8_t address, char channel, int
 {
 	uint8_t data[14]; 
 	size_t length = 0;
-	data[length ++] = (uint8_t)channel;
-	data[length ++] = 0;  // move flags
-	data[length ++] = 1;  // Position
+	data[length] = (uint8_t)channel;
+	length++;
+	data[length] = 0;  // move flags
+	length++;
+	data[length] = 1;  // Position
+	length++;
 	length += bitpackNumber(&data[length], position);
 	if (speedLimit >= 0)
 	{
@@ -346,21 +360,26 @@ size_t kangaroo::writeKangarooPositionCommand(uint8_t address, char channel, int
 
 size_t kangaroo::writeKangarooSpeedCommand(uint8_t address, char channel, int32_t speed, uint8_t* buffer)
 {
-	uint8_t data[14];
+	uint8_t data[14] = {0};
 	size_t length = 0;
-	data[length++] = (uint8_t)channel;
-	data[length++] = 0;  // move flags
-	data[length++] = 2;  // Speed
+	data[length] = (uint8_t)channel;
+	length++;
+	data[length] = 0;  // move flags
+	length++;
+	data[length] = 2;  // Speed
+	length++;
 	length += bitpackNumber(&data[length], speed);
 	return writeKangarooCommand(address, 36, data, length, buffer);
 }
 
 size_t kangaroo::writeKangarooStartCommand(uint8_t address, char channel, uint8_t* buffer)
 {
-	uint8_t data[14];
+	uint8_t data[2] = {0};
 	size_t length = 0;
-	data[length++] = (uint8_t)channel;
-	data[length++] = 0;  // flags
+	data[length] = channel;
+	length++;
+	data[length] = 0;  // flags
+	length++;
 	return writeKangarooCommand(address, 32, data, length, buffer);
 }
 
