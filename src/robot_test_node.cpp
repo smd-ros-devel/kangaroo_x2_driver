@@ -1,4 +1,4 @@
-#include <kangaroo/kangaroo.hpp>
+#include <robot_test/robot_test.hpp>
 
 int main( int argc, char *argv[] )
 {

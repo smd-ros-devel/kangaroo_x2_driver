@@ -1,4 +1,4 @@
-#include "kangaroo/kangaroo.hpp"
+#include "robot_test/robot_test.hpp"
 
 #include <cstdlib>
 #include <cerrno>
@@ -119,7 +119,7 @@ void kangaroo::JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg )
 			ch2_idx = i;
 	}
 
-	if( 0 > idx )
+	if( 0 > ch1_idx && 0 > ch2_idx )
 	{
 		ROS_WARN( "Got a JointTrajectory message with no valid joints" );
 		return;
@@ -137,8 +137,8 @@ void kangaroo::JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg )
 		return;
 	}
 
-	set_ch1( msg->points[0].velocities[ch1_idx] );
-	set_ch2( msg->points[0].velocities[ch2_idx] );
+	set_ch1( msg->points[0].velocities[ch1_idx], 128);
+	set_ch2( msg->points[0].velocities[ch2_idx], 128 );
 }
 
 bool kangaroo::set_ch1( double speed, unsigned char address = 128 )
@@ -158,7 +158,7 @@ bool kangaroo::set_ch1( double speed, unsigned char address = 128 )
 
 	//Send
 	int num_of_bytes = writeKangarooSpeedCommand(address, '1', speed, buffer);
-	if( 0 > write( fd, temp, 2 ) )
+	if( 0 > write( fd, buffer, num_of_bytes ) )
 	{
 		ROS_ERROR( "Failed to update channel 1: %s", strerror( errno ) );
 		close( );
@@ -182,7 +182,7 @@ bool kangaroo::set_ch2( double speed, unsigned char address = 128 )
 	if( speed > 127 )
 		speed = 127;
 	if( speed < -127)
-		speed = -127
+		speed = -127;
 
 	//Send
 	int num_of_bytes = writeKangarooSpeedCommand(address, '2', speed, buffer);
@@ -304,11 +304,11 @@ size_t kangaroo::writeKangarooSpeedCommand(uint8_t address, char channel, int32_
 {
 	uint8_t data[14];
 	size_t length = 0;
-	data[length++] = (uint8)channel;
+	data[length++] = (uint8_t)channel;
 	data[length++] = 0;  // move flags
 	data[length++] = 2;  // Speed
-	length += bitpack_number(&data[length], speed);
-	return writeKangarooCommand(address, 36, data, buffer);
+	length += bitpackNumber(&data[length], speed);
+	return writeKangarooCommand(address, 36, data, length, buffer);
 }
 
 }

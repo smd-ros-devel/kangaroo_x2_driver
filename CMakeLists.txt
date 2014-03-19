@@ -99,13 +99,13 @@ include_directories( include
 )
 
 ## Declare a cpp library
-# add_library(robot_test
-#   src/${PROJECT_NAME}/robot_test.cpp
-# )
+#add_library(robot_test
+#  src/${PROJECT_NAME}/robot_test.cpp
+#)
 
 ## Declare a cpp executable
 # add_executable(robot_test_node src/robot_test_node.cpp )
-add_executable(kangaroo_node src/robot_test_node.cpp src/robot_test.cpp)
+add_executable(robot_test_node src/robot_test_node.cpp src/robot_test.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
@@ -136,7 +136,7 @@ install(TARGETS robot_test_node
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
- )
+)
 
 ## Mark cpp header files for installation
 # install(DIRECTORY include/${PROJECT_NAME}/

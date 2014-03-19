@@ -20,8 +20,8 @@ public:
 private:
 	bool is_open( ) const;
 	void JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg );
-	bool set_ch1( double speed );
-	bool set_ch2( double speed );
+	bool set_ch1( double speed, unsigned char address);
+	bool set_ch2( double speed, unsigned char address);
 
 	std::string port;
 	std::string ch1_joint_name;
@@ -33,10 +33,10 @@ private:
 	ros::Subscriber joint_traj_sub;
 
 	size_t bitpackNumber(uint8_t* buffer, int32_t number);
-	uint15_t crc14(const uint8_t* data, size_t length);
+	uint16_t crc14(const uint8_t* data, size_t length);
 	size_t writeKangarooCommand(uint8_t address, uint8_t command, const uint8_t* data, uint8_t length, uint8_t* buffer);
 	size_t writeKangarooPositionCommand(uint8_t address, char channel, int32_t position, int32_t speedLimit, uint8_t* buffer);
-	size_t writeKangarooPositionCommand(uint8_t address, char channel, int32_t speed, uint8_t* buffer);
+	size_t writeKangarooSpeedCommand(uint8_t address, char channel, int32_t speed, uint8_t* buffer);
 };
 
 }
