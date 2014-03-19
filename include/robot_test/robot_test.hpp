@@ -17,6 +17,8 @@ public:
 	void close( );
 	bool start( );
 	void stop( );
+	bool send_start_signals(uint8_t address);
+	bool get_speed( uint8_t address);
 private:
 	bool is_open( ) const;
 	void JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg );
@@ -37,6 +39,8 @@ private:
 	size_t writeKangarooCommand(uint8_t address, uint8_t command, const uint8_t* data, uint8_t length, uint8_t* buffer);
 	size_t writeKangarooPositionCommand(uint8_t address, char channel, int32_t position, int32_t speedLimit, uint8_t* buffer);
 	size_t writeKangarooSpeedCommand(uint8_t address, char channel, int32_t speed, uint8_t* buffer);
+	size_t writeKangarooStartCommand(uint8_t address, char channel, uint8_t* buffer);
+	size_t writeKangarooGetCommand(uint8_t address, char channel, char parameter, uint8_t* buffer);
 };
 
 }

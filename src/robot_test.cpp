@@ -6,6 +6,8 @@
 #include <fcntl.h>
 #include <termios.h>
 
+#include <iostream>
+
 namespace kangaroo
 {
 
@@ -18,7 +20,7 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	nh_priv( _nh_priv )
 {
 	ROS_INFO( "Initializing" );
-	nh_priv.param( "port", port, (std::string)"/dev/ttyACM0" );
+	nh_priv.param( "port", port, (std::string)"/dev/ttyUSB0" );
 	nh_priv.param( "ch1_joint_name", ch1_joint_name, (std::string)"1" );
 	nh_priv.param( "ch2_joint_name", ch2_joint_name, (std::string)"2" );
 }
@@ -52,16 +54,22 @@ bool kangaroo::open( )
 		ROS_FATAL( "Failed to fetch port attributes: %s", strerror( errno ) );
 		return false;
 	}
-	if( 0 > cfsetispeed( &fd_options, B9600 ) )
+	//if( 0 > cfsetispeed( &fd_options, B9600 ) )
+	if( 0 > cfsetispeed( &fd_options, B9600) )
 	{
 		ROS_FATAL( "Failed to set input baud: %s", strerror( errno ) );
 		return false;
 	}
+	//if( 0 > cfsetospeed( &fd_options, B9600 ) )
 	if( 0 > cfsetospeed( &fd_options, B9600 ) )
 	{
 		ROS_FATAL( "Failed to set output baud: %s", strerror( errno ) );
 		return false;
 	}
+	fd_options.c_cflag &= ~HUPCL;
+	fd_options.c_lflag &= ~ICANON;
+	fd_options.c_cc[VTIME] = 2;
+	fd_options.c_cc[VMIN] = 0;
 	if( 0 > tcsetattr( fd, TCSANOW, &fd_options ) )
 	{
 		ROS_FATAL( "Failed to set port attributes: %s", strerror( errno ) );
@@ -87,6 +95,29 @@ bool kangaroo::start( )
 
 	if( !joint_traj_sub )
 		joint_traj_sub = nh.subscribe( "joint_trajectory", 1, &kangaroo::JointTrajCB, this );
+
+
+	return true;
+}
+
+bool kangaroo::send_start_signals(uint8_t address)
+{
+	uint8_t buffer[18];
+	int num_of_bytes_1 = writeKangarooStartCommand(address, '1', buffer);
+        if( 0 > write( fd, buffer, num_of_bytes_1 ) )
+        {
+                ROS_ERROR( "Failed to update channel 1: %s", strerror( errno ) );
+                close( );
+                return false;
+        }
+
+	int num_of_bytes_2 = writeKangarooStartCommand(address, '2', buffer);
+        if( 0 > write( fd, buffer, num_of_bytes_2 ) )
+        {
+                ROS_ERROR( "Failed to update channel 2: %s", strerror( errno ) );
+                close( );
+                return false;
+        }
 
 	return true;
 }
@@ -137,24 +168,25 @@ void kangaroo::JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg )
 		return;
 	}
 
+	ROS_WARN( "Got a valid JointTrajectory message" );
+
 	set_ch1( msg->points[0].velocities[ch1_idx], 128);
-	set_ch2( msg->points[0].velocities[ch2_idx], 128 );
+	//set_ch2( msg->points[0].velocities[ch2_idx], 128 );
+
+	//get_speed(128);	
 }
 
 bool kangaroo::set_ch1( double speed, unsigned char address = 128 )
 {
+
+	std::cout << "Sending " << speed << " to Channel 1" << std::endl;
+
 	if( !is_open( ) && !open( ) )
 		return false;
 
 	uint8_t buffer[18];
 
-	speed *= 127;
-
-	// Normalize 
-	if( speed > 127 )
-		speed = 127;
-	if( speed < -127)
-		speed = -127;
+	speed *= 1000;
 
 	//Send
 	int num_of_bytes = writeKangarooSpeedCommand(address, '1', speed, buffer);
@@ -171,18 +203,12 @@ bool kangaroo::set_ch1( double speed, unsigned char address = 128 )
 
 bool kangaroo::set_ch2( double speed, unsigned char address = 128 )
 {
+	std::cout << "Sending " << speed << " to Channel 2" << std::endl;
 	if( !is_open( ) && !open( ) )
 		return false;
 
 	uint8_t buffer[18];
-
-	speed *= 127;
-
-	// Normalize
-	if( speed > 127 )
-		speed = 127;
-	if( speed < -127)
-		speed = -127;
+	speed *= 1000;
 
 	//Send
 	int num_of_bytes = writeKangarooSpeedCommand(address, '2', speed, buffer);
@@ -190,6 +216,24 @@ bool kangaroo::set_ch2( double speed, unsigned char address = 128 )
 	{
 		ROS_ERROR( "Failed to update channel 2: %s", strerror( errno ) );
 		close( );
+		return false;
+	}
+
+	return true;
+}
+
+bool kangaroo::get_speed( unsigned char address )
+{
+	if( !is_open( ) && !open() )
+		return false;
+
+	uint8_t buffer[18];
+	
+	int num_of_bytes = writeKangarooGetCommand(address, '2', 2, buffer);
+	if( 0 > write( fd, buffer, num_of_bytes) )
+	{
+		ROS_ERROR( "Failed to write to the thingy." );
+		close();
 		return false;
 	}
 
@@ -309,6 +353,25 @@ size_t kangaroo::writeKangarooSpeedCommand(uint8_t address, char channel, int32_
 	data[length++] = 2;  // Speed
 	length += bitpackNumber(&data[length], speed);
 	return writeKangarooCommand(address, 36, data, length, buffer);
+}
+
+size_t kangaroo::writeKangarooStartCommand(uint8_t address, char channel, uint8_t* buffer)
+{
+	uint8_t data[14];
+	size_t length = 0;
+	data[length++] = (uint8_t)channel;
+	data[length++] = 0;  // flags
+	return writeKangarooCommand(address, 32, data, length, buffer);
+}
+
+size_t kangaroo::writeKangarooGetCommand(uint8_t address, char channel, char parameter, uint8_t* buffer)
+{
+	uint8_t data[14];
+	size_t length = 0;
+	data[length++] = (uint8_t)channel;
+	data[length++] = 0;
+	data[length++] = parameter;
+	return writeKangarooCommand(address, 26, data, length, buffer);
 }
 
 }
