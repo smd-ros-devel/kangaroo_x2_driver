@@ -14,27 +14,31 @@ class kangaroo
 {
 public:
 	kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv );
-
+	//~kangaroo();
 	bool open( );
 	void close( );
 	bool start( );
 	void stop( );
 	bool send_start_signals(uint8_t address);
-	bool send_speed_request( uint8_t address, char channel );
-	bool send_position_request( unsigned char address, char channel );
+	int get_speed( uint8_t address, char channel, bool& ok );
+	int get_position( unsigned char address, char channel, bool& ok );
 	bool send_get_request( uint8_t address, char channel, uint8_t desired_parameter);
 	void poll_kangaroo( unsigned char address );
+	bool read_the_rest(unsigned char address);
+	void read_thread();
 
 private:
 	bool is_open( ) const;
 	void JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg );
-	bool set_ch1( double speed, unsigned char address);
-	bool set_ch2( double speed, unsigned char address);
+	//bool set_ch1( double speed, unsigned char address);
+	//bool set_ch2( double speed, unsigned char address);
 
 	int un_bitpack_number( uint8_t* data, size_t num_of_bytes );
-	bool evaluate_kangaroo_response( uint8_t* header, uint8_t* data,
-        uint8_t address, sensor_msgs::JointStatePtr& msg, char channel, uint8_t parameter);
-
+	int evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint8_t* data, bool& ok);
+	void handle_errors(uint8_t address, int error_code);
+	int read_from_serial(uint8_t address, char channel, bool& ok);
+	uint8_t read_one_byte(bool& ok);
+	bool set_channel_speed(double speed, unsigned char address, char channel);
 
 	std::string port;
 	std::string ch1_joint_name;
