@@ -99,9 +99,9 @@ include_directories( include
 )
 
 ## Declare a cpp library
-#add_library(robot_test
-#  src/${PROJECT_NAME}/robot_test.cpp
-#)
+add_library( kang_lib
+  src/${PROJECT_NAME}/kang_lib.cpp
+)
 
 ## Declare a cpp executable
 # add_executable(robot_test_node src/robot_test_node.cpp )
