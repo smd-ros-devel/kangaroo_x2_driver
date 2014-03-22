@@ -8,8 +8,8 @@
 
 #include <iostream>
 
-namespace kangaroo
-{
+//namespace kangaroo
+//{
 
 kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	port( "" ),
@@ -25,15 +25,14 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	nh_priv.param( "ch2_joint_name", ch2_joint_name, (std::string)"2" );
 }
 
-bool kangaroo::open( )
+bool kangaroo::open()
 {
 	struct termios fd_options;
-	//unsigned char baud_autodetect = 0xAA;
 
-	if( is_open( ) )
+	if( is_open() )
 	{
 		ROS_INFO( "Port is already open - Closing to re-open" );
-		close( );
+		close();
 	}
 
 	fd = ::open( port.c_str( ), O_RDWR | O_NOCTTY | O_NDELAY );
@@ -42,13 +41,11 @@ bool kangaroo::open( )
 		ROS_FATAL( "Failed to open port: %s", strerror( errno ) );
 		return false;
 	}
-
 	if( 0 > fcntl( fd, F_SETFL, 0 ) )
 	{
 		ROS_FATAL( "Failed to set port descriptor: %s", strerror( errno ) );
 		return false;
 	}
-
 	if( 0 > tcgetattr( fd, &fd_options ) )
 	{
 		ROS_FATAL( "Failed to fetch port attributes: %s", strerror( errno ) );
@@ -86,43 +83,15 @@ void kangaroo::close( )
 
 bool kangaroo::start( )
 {
-	if( !is_open( ) && !open( ) )
+	if( !is_open() && !open() )
 		return false;
-
 	ROS_INFO( "Starting" );
-
 	if( !joint_traj_sub )
 		joint_traj_sub = nh.subscribe( "joint_trajectory", 1, &kangaroo::JointTrajCB, this );
-
 	if( !joint_state_pub)
 		joint_state_pub = nh.advertise<sensor_msgs::JointState>( "joint_state", 2);
 
-	send_start_signals((uint8_t)128);
-
-//	send_speed_request( (uint8_t)128, ch1_joint_name);
-
-	return true;
-}
-
-bool kangaroo::send_start_signals(uint8_t address)
-{
-	uint8_t buffer[7];
-	int num_of_bytes_1 = writeKangarooStartCommand(address, '1', buffer);
-        if( 0 > write( fd, buffer, num_of_bytes_1 ) )
-        {
-                ROS_ERROR( "Failed to update channel 1: %s", strerror( errno ) );
-                close( );
-                return false;
-        }
-
-	int num_of_bytes_2 = writeKangarooStartCommand(address, '2', buffer);
-        if( 0 > write( fd, buffer, num_of_bytes_2 ) )
-        {
-                ROS_ERROR( "Failed to update channel 2: %s", strerror( errno ) );
-                close( );
-                return false;
-        }
-
+	send_start_signals((unsigned char)128);
 	return true;
 }
 
@@ -141,38 +110,38 @@ bool kangaroo::is_open( ) const
 	return ( fd >= 0 );
 }
 
-void kangaroo::JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg )
+void kangaroo::JointTrajCB(const trajectory_msgs::JointTrajectoryPtr &msg)
 {
 	int ch1_idx = -1;
 	int ch2_idx = -1;
 
-	for( size_t i = 0; i < msg->joint_names.size( ); i++ )
+	for (size_t i = 0; i < msg->joint_names.size(); i++)
 	{
-		if( msg->joint_names[i] == ch1_joint_name )
+		if (msg->joint_names[i] == ch1_joint_name)
 			ch1_idx = i;
-		if( msg->joint_names[i] == ch2_joint_name )
+		if (msg->joint_names[i] == ch2_joint_name)
 			ch2_idx = i;
 	}
 
-	if( 0 > ch1_idx && 0 > ch2_idx )
+	if (0 > ch1_idx && 0 > ch2_idx)
 	{
-		ROS_WARN( "Got a JointTrajectory message with no valid joints" );
+		ROS_WARN("Got a JointTrajectory message with no valid joints");
 		return;
 	}
 
-	if( 1 > msg->points.size( ) )
+	if (1 > msg->points.size())
 	{
-		ROS_WARN( "Got a JointTrajectory message with no valid points" );
+		ROS_WARN("Got a JointTrajectory message with no valid points");
 		return;
 	}
 
-	if( msg->joint_names.size( ) != msg->points[0].velocities.size( ) )
+	if (msg->joint_names.size() != msg->points[0].velocities.size())
 	{
-		ROS_WARN( "Got a JointTrajectory message whose points have no velocities" );
+		ROS_WARN("Got a JointTrajectory message whose points have no velocities");
 		return;
 	}
 
-	ROS_WARN( "Got a valid JointTrajectory message" );
+	ROS_WARN("Got a valid JointTrajectory message");
 
 	tcflush(fd, TCOFLUSH);
 
@@ -181,113 +150,156 @@ void kangaroo::JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg )
 	set_channel_speed(msg->points[0].velocities[ch2_idx], 128, '2');
 }
 
-void kangaroo::poll_kangaroo(unsigned char address)
+bool kangaroo::send_start_signals(unsigned char address)
 {
-	sensor_msgs::JointStatePtr msg(new sensor_msgs::JointState);
-	msg->name.resize(2);
-	msg->velocity.resize(2);
-	msg->position.resize(2);
-	msg->name[0] = ch1_joint_name;
-	msg->name[1] = ch2_joint_name;
+	unsigned char buffer[7];
+	int num_of_bytes_1 = writeKangarooStartCommand(address, '1', buffer);
+	if (0 > write(fd, buffer, num_of_bytes_1))
+	{
+		ROS_ERROR("Failed to update channel 1: %s", strerror(errno));
+		close();
+		return false;
+	}
 
-	// set the lock
-	boost::mutex::scoped_lock io_lock(io_mutex);
+	int num_of_bytes_2 = writeKangarooStartCommand(address, '2', buffer);
+	if (0 > write(fd, buffer, num_of_bytes_2))
+	{
+		ROS_ERROR("Failed to update channel 2: %s", strerror(errno));
+		close();
+		return false;
+	}
 
-	// flush the input buffer
-	tcflush(fd, TCIFLUSH);
-	tcflush(fd, TCOFLUSH);
-	// construct the message
-	bool ok = true;
-	// channel 1
-	msg->velocity[0] = get_speed(address, '1', ok);
-	if (!ok)
-		return;
-
-	tcflush(fd, TCIFLUSH);
-	tcflush(fd, TCOFLUSH);
-	msg->position[0] = get_position(address, '1', ok);
-	if (!ok)
-		return;
-
-	// channel 2
-	tcflush(fd, TCIFLUSH);
-	tcflush(fd, TCOFLUSH);
-	msg->velocity[1] = get_speed(address, '2', ok);
-	if (!ok)
-		return;
-	tcflush(fd, TCIFLUSH);
-	tcflush(fd, TCOFLUSH);
-	msg->position[1] = get_position(address, '2', ok);
-	if (!ok)
-		return;
-
-	joint_state_pub.publish(msg);
-	//delete msg;
+	return true;
 }
 
-int kangaroo::get_speed(uint8_t address, char channel, bool& ok)
+bool kangaroo::set_channel_speed(double speed, unsigned char address, char channel)
 {
-	ok = send_get_request(address, channel, 2);		// 2 is for velocity
-	if (!ok)
-		return 0;
-	tcflush(fd, TCOFLUSH);	// TODO: verify
-	return read_from_serial(address, channel, ok);
+	std::cout << "Sending " << speed << " to Channel " << channel << std::endl;
+
+	if (!is_open() && !open())
+		return false;
+
+	// lock the mutex, since we will be writing to the serial port
+	boost::mutex::scoped_lock(io_mutex);
+
+	unsigned char buffer[18];
+
+	//Send
+	int num_of_bytes = write_kangaroo_speed_command(address, channel, speed, buffer);
+	if (0 > write(fd, buffer, num_of_bytes))
+	{
+		ROS_ERROR("Failed to update channel %c: %s", channel, strerror(errno));
+		close();
+		return false;
+	}
+	return true;
 }
 
-int kangaroo::get_position(uint8_t address, char channel, bool& ok)
+bool kangaroo::send_get_request(unsigned char address, char channel, unsigned char desired_parameter)
 {
-	ok = send_get_request(address, channel, 1);		// 1 is for position
-	if (!ok)
-		return 0;
-	tcflush(fd, TCOFLUSH);	// TODO: verify
-	return read_from_serial(address, channel, ok);
+	if (!is_open() && !open())
+		return false;
+
+	unsigned char buffer[18];
+
+	if (!(desired_parameter == 1 || desired_parameter == 2))
+	{
+		ROS_ERROR("Invalid parameter for get request.");
+		return false;
+	}
+
+	// lock the mutex, since we will be writing to the serial port
+	boost::mutex::scoped_lock(io_mutex);
+
+	int num_of_bytes = write_kangaroo_get_command(address, channel, desired_parameter, buffer);
+	if (0 > write(fd, buffer, num_of_bytes))
+	{
+		ROS_ERROR("Failed to write to the thingy.");
+		close();
+		return false;
+	}
+
+	return true;
 }
 
-int kangaroo::read_from_serial(uint8_t address, char channel, bool& ok)
+void kangaroo::read_thread()
+{
+	while (ros::ok)
+	{
+		unsigned char byte;
+		if (0 > read(fd, &byte, 1))
+			ROS_WARN("An error occurred while reading. - Main read thread.");
+		if (byte == (unsigned char)128)
+			read_message(byte);
+	}
+}
+
+bool kangaroo::read_message(unsigned char address)
 {
 	// note: we aren't guaranteed the exact number of bytes that the
 	//   kangaroo will respond with, so we must read the header and 
 	//   data separately
 	bool one_byte_ok = true;
-	uint8_t header[3] = { 0 };
-	uint8_t data[10] = { 0 }; // 1 for channel name, 1 for flags, 
-				// 1 for parameter, 5 (max) for bit-packed value, 2 for crc
+	unsigned char header[3] = { 0 };
+	unsigned char data[8] = { 0 }; 	// 1 for channel name, 1 for flags, 
+	// 1 for parameter, 5 (max) for bit-packed value
+	unsigned char crc[2] = { 0 };		// crc is 2 bytes long
 
-	for (size_t i = 0; i < 3; i++)
+	header[0] = address;
+	for (size_t i = 1; i < 3; i++)
 	{
 		header[i] = read_one_byte(one_byte_ok);
 		// bail if reading one byte fails
 		if (!one_byte_ok)
 		{
 			ROS_ERROR("Error when reading header from kangaroo.");
-			ok = false;
-			return 0;
+			//ok = false;
+			return false;
 		}
 	}
 	std::cout << "Header: " << (int)header[0] << ", " << (int)header[1] << ", " << (int)header[2] << std::endl;
 
-	for (size_t i = 0; i < header[2] + 2; i++)
+	// Read the data
+	for (size_t i = 0; i < header[2]; i++)
 	{
 		data[i] = read_one_byte(one_byte_ok);
 		// bail if reading one byte fails
 		if (!one_byte_ok)
 		{
 			ROS_ERROR("Error when reading *data* from kangaroo.");
-			ok = false;
+			//ok = false;
 			return 0;
 		}
 	}
+	// print the data ( DEBUG ONLY)
+	std::cout << "Data: ";
+	for (size_t i = 0; i < header[2]; i++)
+		std::cout << (int)data[i] << ", ";
+	std::wcout << std::endl;
+	
+	// read the error correcting code
+	for (size_t i = 0; i < 2; i++)
+	{
+		crc[i] = read_one_byte(one_byte_ok);
+		// bail if reading one byte fails
+		if (!one_byte_ok)
+		{
+			ROS_ERROR("Error when reading *data* from kangaroo.");
+			//ok = false;
+			return 0;
+		}
+	}
+	// Print the CRC (Debug only)
+	std::cout << "CRC: " << (int)crc[0] << ", " << (int)crc[1] << std::endl;
 
-	// evaluate the read data
-	bool evaluate_ok = true;
-	int value = evaluate_kangaroo_response(address, header, data, evaluate_ok);
-	ok = evaluate_ok;
-	return value;
+	bool ok = true;
+	evaluate_kangaroo_response(address, header, data, ok);
+	return ok;
 }
 
-uint8_t kangaroo::read_one_byte(bool& ok)
+unsigned char kangaroo::read_one_byte(bool& ok)
 {
-	uint8_t buffer;
+	unsigned char buffer;
 
 	int bits_read = read(fd, &buffer, 1);
 	if (bits_read > 0)
@@ -322,61 +334,7 @@ uint8_t kangaroo::read_one_byte(bool& ok)
 	return buffer;
 }
 
-void kangaroo::read_thread( )
-{
-	while (ros::ok)
-	{
-		unsigned char byte;
-		if( 0 > read(fd, &byte, 1) )
-			ROS_WARN("An error occurred while reading.");
-		if(byte == (unsigned char)128)
-			read_the_rest( byte );
-	}
-}
-
-bool kangaroo::read_the_rest( unsigned char address )
-{
-	// note: we aren't guaranteed the exact number of bytes that the
-	//   kangaroo will respond with, so we must read the header and 
-	//   data separately
-	bool one_byte_ok = true;
-	uint8_t header[3] = { 0 };
-	uint8_t data[8] = { 0 }; 	// 1 for channel name, 1 for flags, 
-					// 1 for parameter, 5 (max) for bit-packed value
-	uint8_t crc[2] = { 0 };		// crc is 2 bytes long
-
-	header[0] = address;
-	for (size_t i = 1; i < 3; i++)
-        {
-                header[i] = read_one_byte(one_byte_ok);
-                // bail if reading one byte fails
-                if (!one_byte_ok)
-                {
-                        ROS_ERROR("Error when reading header from kangaroo.");
-                        //ok = false;
-                        return false;
-                }
-        }
-        std::cout << "Header: " << (int)header[0] << ", " << (int)header[1] << ", " << (int)header[2] << std::endl;
-
-        for (size_t i = 0; i < header[2] + 2; i++)
-        {
-                data[i] = read_one_byte(one_byte_ok);
-                // bail if reading one byte fails
-                if (!one_byte_ok)
-                {
-                        ROS_ERROR("Error when reading *data* from kangaroo.");
-                        //ok = false;
-                        return 0;
-                }
-        }
-
-	bool ok = true;
-	evaluate_kangaroo_response( address, header, data, ok );
-	return ok;
-}
-
-int kangaroo::evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint8_t* data, bool& ok)
+int kangaroo::evaluate_kangaroo_response( unsigned char address, unsigned char* header, unsigned char* data, bool& ok)
 {
 	ROS_INFO( "Evaluating the response." );
 	size_t data_size = header[2];
@@ -405,9 +363,7 @@ int kangaroo::evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint
 		ROS_WARN( "The controller is in motion." );
 
 	sensor_msgs::JointStatePtr msg(new sensor_msgs::JointState);
-        msg->name.resize(1);
-        //msg->name[0] = ch1_joint_name;
-        //msg->name[1] = ch2_joint_name;
+	msg->name.resize(1);
 	if(data[0] == '1')
 		msg->name[0] = ch1_joint_name;
 	else
@@ -425,11 +381,10 @@ int kangaroo::evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint
 	}
 
 	joint_state_pub.publish(msg);
-	//delete msg;
 	return value;
 }
 
-void kangaroo::handle_errors(uint8_t address, int error_code)
+void kangaroo::handle_errors(unsigned char address, int error_code)
 {
 	switch (error_code)
 	{
@@ -457,4 +412,108 @@ void kangaroo::handle_errors(uint8_t address, int error_code)
 	return;
 }
 
-}
+//}
+
+//void kangaroo::poll_kangaroo(unsigned char address)
+//{
+//	sensor_msgs::JointStatePtr msg(new sensor_msgs::JointState);
+//	msg->name.resize(2);
+//	msg->velocity.resize(2);
+//	msg->position.resize(2);
+//	msg->name[0] = ch1_joint_name;
+//	msg->name[1] = ch2_joint_name;
+//
+//	// set the lock
+//	boost::mutex::scoped_lock io_lock(io_mutex);
+//
+//	// flush the input buffer
+//	tcflush(fd, TCIFLUSH);
+//	tcflush(fd, TCOFLUSH);
+//	// construct the message
+//	bool ok = true;
+//	// channel 1
+//	msg->velocity[0] = get_speed(address, '1', ok);
+//	if (!ok)
+//		return;
+//
+//	tcflush(fd, TCIFLUSH);
+//	tcflush(fd, TCOFLUSH);
+//	msg->position[0] = get_position(address, '1', ok);
+//	if (!ok)
+//		return;
+//
+//	// channel 2
+//	tcflush(fd, TCIFLUSH);
+//	tcflush(fd, TCOFLUSH);
+//	msg->velocity[1] = get_speed(address, '2', ok);
+//	if (!ok)
+//		return;
+//	tcflush(fd, TCIFLUSH);
+//	tcflush(fd, TCOFLUSH);
+//	msg->position[1] = get_position(address, '2', ok);
+//	if (!ok)
+//		return;
+//
+//	joint_state_pub.publish(msg);
+//	//delete msg;
+//}
+
+//int kangaroo::get_speed(unsigned char address, char channel, bool& ok)
+//{
+//	ok = send_get_request(address, channel, 2);		// 2 is for velocity
+//	if (!ok)
+//		return 0;
+//	tcflush(fd, TCOFLUSH);	// TODO: verify
+//	return read_from_serial(address, channel, ok);
+//}
+
+//int kangaroo::get_position(unsigned char address, char channel, bool& ok)
+//{
+//	ok = send_get_request(address, channel, 1);		// 1 is for position
+//	if (!ok)
+//		return 0;
+//	tcflush(fd, TCOFLUSH);	// TODO: verify
+//	return read_from_serial(address, channel, ok);
+//}
+
+//int kangaroo::read_from_serial(unsigned char address, char channel, bool& ok)
+//{
+//	// note: we aren't guaranteed the exact number of bytes that the
+//	//   kangaroo will respond with, so we must read the header and 
+//	//   data separately
+//	bool one_byte_ok = true;
+//	unsigned char header[3] = { 0 };
+//	unsigned char data[10] = { 0 }; // 1 for channel name, 1 for flags, 
+//				// 1 for parameter, 5 (max) for bit-packed value, 2 for crc
+//
+//	for (size_t i = 0; i < 3; i++)
+//	{
+//		header[i] = read_one_byte(one_byte_ok);
+//		// bail if reading one byte fails
+//		if (!one_byte_ok)
+//		{
+//			ROS_ERROR("Error when reading header from kangaroo.");
+//			ok = false;
+//			return 0;
+//		}
+//	}
+//	std::cout << "Header: " << (int)header[0] << ", " << (int)header[1] << ", " << (int)header[2] << std::endl;
+//
+//	for (size_t i = 0; i < header[2] + 2; i++)
+//	{
+//		data[i] = read_one_byte(one_byte_ok);
+//		// bail if reading one byte fails
+//		if (!one_byte_ok)
+//		{
+//			ROS_ERROR("Error when reading *data* from kangaroo.");
+//			ok = false;
+//			return 0;
+//		}
+//	}
+//
+//	// evaluate the read data
+//	bool evaluate_ok = true;
+//	int value = evaluate_kangaroo_response(address, header, data, evaluate_ok);
+//	ok = evaluate_ok;
+//	return value;
+//}

@@ -6,9 +6,10 @@
 #include <sensor_msgs/JointState.h>
 #include <stdint.h>
 #include <boost/thread.hpp>
+#include <string>
 
-namespace kangaroo
-{
+//namespace kangaroo
+//{
 
 class kangaroo
 {
@@ -19,49 +20,50 @@ public:
 	void close( );
 	bool start( );
 	void stop( );
-	bool send_start_signals(uint8_t address);
-	int get_speed( uint8_t address, char channel, bool& ok );
-	int get_position( unsigned char address, char channel, bool& ok );
-	bool send_get_request( uint8_t address, char channel, uint8_t desired_parameter);
-	void poll_kangaroo( unsigned char address );
-	bool read_the_rest(unsigned char address);
+
+	// continually reads from the serial port.  Meant to be called as a thread
 	void read_thread();
 
 private:
 	bool is_open( ) const;
 	void JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg );
-	//bool set_ch1( double speed, unsigned char address);
-	//bool set_ch2( double speed, unsigned char address);
 
-	int un_bitpack_number( uint8_t* data, size_t num_of_bytes );
+	// functions for sending information to the kangaroo
+	bool send_get_request(unsigned char address, char channel, unsigned char desired_parameter);
+	bool set_channel_speed(double speed, unsigned char address, char channel);
+	bool send_start_signals(uint8_t address);
+
+	// functions used in the read_thread
+	bool read_message(unsigned char address);
+	uint8_t read_one_byte(bool& ok);
 	int evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint8_t* data, bool& ok);
 	void handle_errors(uint8_t address, int error_code);
-	int read_from_serial(uint8_t address, char channel, bool& ok);
-	uint8_t read_one_byte(bool& ok);
-	bool set_channel_speed(double speed, unsigned char address, char channel);
 
+	// address of the serial port
 	std::string port;
+	// the joints names for the two motors
 	std::string ch1_joint_name;
 	std::string ch2_joint_name;
+	// file descriptor, which is used for accessing serial ports in C.
+	//   it's essentially an address to the serial port
 	int fd;
 
+	// Node handles
 	ros::NodeHandle nh;
 	ros::NodeHandle nh_priv;
 	ros::Subscriber joint_traj_sub;
+	ros::Publisher joint_state_pub;
+	// mutex that is used for allowing only one message to be sent at a time
 	boost::mutex io_mutex;
 
-	ros::Publisher joint_state_pub;
-
-	size_t bitpackNumber(uint8_t* buffer, int32_t number);
-	uint16_t crc14(const uint8_t* data, size_t length);
-	size_t writeKangarooCommand(uint8_t address, uint8_t command, const uint8_t* data, uint8_t length, uint8_t* buffer);
-	size_t writeKangarooPositionCommand(uint8_t address, char channel, int32_t position, int32_t speedLimit, uint8_t* buffer);
-	size_t writeKangarooSpeedCommand(uint8_t address, char channel, int32_t speed, uint8_t* buffer);
-	size_t writeKangarooStartCommand(uint8_t address, char channel, uint8_t* buffer);
-	size_t writeKangarooGetCommand(uint8_t address, char channel, char parameter, uint8_t* buffer);
+	//int read_from_serial(uint8_t address, char channel, bool& ok);
+	//int get_speed( uint8_t address, char channel, bool& ok );
+	//int get_position( unsigned char address, char channel, bool& ok );
+	//void poll_kangaroo( unsigned char address );
+	//int read_from_serial(uint8_t address, char channel, bool& ok);
 };
 
-}
+//}
 
 #endif /* _kangaroo_hpp */
 
