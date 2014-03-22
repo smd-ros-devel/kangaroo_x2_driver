@@ -100,7 +100,7 @@ include_directories( include
 
 ## Declare a cpp library
 add_library( kang_lib
-  src/${PROJECT_NAME}/kang_lib.cpp
+  src/kang_lib.cpp
 )
 
 ## Declare a cpp executable
@@ -112,7 +112,7 @@ add_executable(kangaroo_driver_node src/kangaroo_driver_node.cpp src/kangaroo_dr
 # add_dependencies(robot_test_node robot_test_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(kangaroo_driver_node
+target_link_libraries(kangaroo_driver_node kang_lib
   ${catkin_LIBRARIES}
 )
 

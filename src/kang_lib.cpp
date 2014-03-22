@@ -7,8 +7,10 @@
 #include <cstring>
 #include <fcntl.h>
 #include <termios.h>
-
+#include <stdint.h>
 #include <iostream>
+
+#include "kangaroo_driver/kang_lib.hpp"
 
 size_t bitpack_number(unsigned char* buffer, int number);
 int un_bitpack_number(unsigned char* data, size_t num_of_bytes);

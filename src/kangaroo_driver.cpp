@@ -1,4 +1,5 @@
 #include "kangaroo_driver/kangaroo_driver.hpp"
+#include "kangaroo_driver/kang_lib.hpp"
 
 #include <cstdlib>
 #include <cerrno>
@@ -153,7 +154,7 @@ void kangaroo::JointTrajCB(const trajectory_msgs::JointTrajectoryPtr &msg)
 bool kangaroo::send_start_signals(unsigned char address)
 {
 	unsigned char buffer[7];
-	int num_of_bytes_1 = writeKangarooStartCommand(address, '1', buffer);
+	int num_of_bytes_1 = write_kangaroo_start_command(address, '1', buffer);
 	if (0 > write(fd, buffer, num_of_bytes_1))
 	{
 		ROS_ERROR("Failed to update channel 1: %s", strerror(errno));
@@ -161,7 +162,7 @@ bool kangaroo::send_start_signals(unsigned char address)
 		return false;
 	}
 
-	int num_of_bytes_2 = writeKangarooStartCommand(address, '2', buffer);
+	int num_of_bytes_2 = write_kangaroo_start_command(address, '2', buffer);
 	if (0 > write(fd, buffer, num_of_bytes_2))
 	{
 		ROS_ERROR("Failed to update channel 2: %s", strerror(errno));

@@ -4,7 +4,7 @@ int main( int argc, char *argv[] )
 {
 	ros::NodeHandle *nh = NULL;
 	ros::NodeHandle *nh_priv = NULL;
-	kangaroo::kangaroo *kang = NULL;
+	kangaroo *kang = NULL;
 
 	ros::init( argc, argv, "kangaroo_node" );
 
@@ -23,7 +23,7 @@ int main( int argc, char *argv[] )
 		ros::shutdown( );
 		return -2;
 	}
-	kang = new kangaroo::kangaroo( *nh, *nh_priv );
+	kang = new kangaroo( *nh, *nh_priv );
 	if( !kang )
 	{
 		ROS_FATAL( "Failed to initialize driver" );
@@ -35,7 +35,7 @@ int main( int argc, char *argv[] )
 	if( !kang->start( ) )
 		ROS_ERROR( "Failed to start the driver" );
 
-	boost::thread t(&kangaroo::read_thread);
+	boost::thread t(&kangaroo::read_thread, kang);
 
 	ros::spin( );
 
