@@ -35,11 +35,7 @@ int main( int argc, char *argv[] )
 	if( !kang->start( ) )
 		ROS_ERROR( "Failed to start the driver" );
 
-	boost::thread t(&kangaroo::read_thread, kang);
-
 	ros::spin( );
-
-	t.join();
 
 	delete kang;
 	delete nh_priv;

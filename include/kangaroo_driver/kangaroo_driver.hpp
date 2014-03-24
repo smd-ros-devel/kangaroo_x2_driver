@@ -22,12 +22,7 @@ public:
 	bool start( );
 	void stop( );
 
-	// continually reads from the serial port.  Meant to be called as a thread
-	void read_thread();
-
-	void requestCB( const ros::WallTimerEvent &e );
-
-	sensor_msgs::JointStatePtr msg;
+	void JointStateCB( const ros::WallTimerEvent &e );
 
 private:
 	bool is_open( ) const;
@@ -39,8 +34,9 @@ private:
 	bool set_channel_speed(double speed, unsigned char address, char channel);
 	bool send_start_signals(uint8_t address);
 
-	// functions used in the read_thread
-	bool read_message(unsigned char address);
+	// functions used for the request - response  (JointStateCB)
+	int get_parameter(unsigned char address, char channel, unsigned char desired_parameter);
+	bool read_message(unsigned char address, bool& ok);
 	uint8_t read_one_byte(bool& ok);
 	int evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint8_t* data, bool& ok);
 	void handle_errors(uint8_t address, int error_code);
@@ -53,15 +49,17 @@ private:
 	// file descriptor, which is used for accessing serial ports in C.
 	//   it's essentially an address to the serial port
 	int fd;
-	int request_written;
 	// Node handles
 	ros::NodeHandle nh;
 	ros::NodeHandle nh_priv;
 	ros::WallTimer poll_timer;
 	ros::Subscriber joint_traj_sub;
 	ros::Publisher joint_state_pub;
-	// mutex that is used for allowing only one message to be sent at a time
-	boost::mutex io_mutex;
+	
+	// mutex-es for accessing the serial that the kangaroo is connected on
+	// output_mutex *must* be locked first
+	boost::mutex ouput_mutex;
+	boost::mutex input_mutex;
 
 	//Joint State pointer, used to publish a joint state message
 	//sensor_msgs::JointStatePtr msg;
