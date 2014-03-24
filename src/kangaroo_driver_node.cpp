@@ -39,6 +39,7 @@ int main( int argc, char *argv[] )
 
 	ros::spin( );
 
+	t.join();
 
 	delete kang;
 	delete nh_priv;

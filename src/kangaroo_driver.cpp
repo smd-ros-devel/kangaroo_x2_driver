@@ -6,6 +6,9 @@
 #include <cstring>
 #include <fcntl.h>
 #include <termios.h>
+#include <unistd.h>
+
+#include <bitset>
 
 #include <iostream>
 
@@ -18,12 +21,22 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	ch2_joint_name( "2" ),
 	fd( -1 ),
 	nh( _nh ),
-	nh_priv( _nh_priv )
+	nh_priv( _nh_priv ),
+	request_written(0),
+	msg(new sensor_msgs::JointState)
 {
 	ROS_INFO( "Initializing" );
 	nh_priv.param( "port", port, (std::string)"/dev/ttyUSB0" );
 	nh_priv.param( "ch1_joint_name", ch1_joint_name, (std::string)"1" );
 	nh_priv.param( "ch2_joint_name", ch2_joint_name, (std::string)"2" );
+
+	msg->name.resize(2);
+	msg->name[0] = ch1_joint_name;
+	msg->name[1] = ch2_joint_name;
+	msg->velocity.resize(2);
+	msg->position.resize(2);
+
+	poll_timer = nh.createWallTimer( ros::WallDuration(0.05), &kangaroo::requestCB, this );
 }
 
 bool kangaroo::open()
@@ -52,20 +65,43 @@ bool kangaroo::open()
 		ROS_FATAL( "Failed to fetch port attributes: %s", strerror( errno ) );
 		return false;
 	}
-	if( 0 > cfsetispeed( &fd_options, B9600) )
+	if( 0 > cfsetispeed( &fd_options, B38400) )
 	{
 		ROS_FATAL( "Failed to set input baud: %s", strerror( errno ) );
 		return false;
 	}
-	if( 0 > cfsetospeed( &fd_options, B9600 ) )
+	if( 0 > cfsetospeed( &fd_options, B38400 ) )
 	{
 		ROS_FATAL( "Failed to set output baud: %s", strerror( errno ) );
 		return false;
 	}
-	fd_options.c_cflag &= ~HUPCL;
-	fd_options.c_lflag &= ~ICANON;
-	fd_options.c_cc[VTIME] = 1;
-	fd_options.c_cc[VMIN] = 0;
+
+	fd_options.c_cflag |= ( CREAD | CLOCAL | CS8 );
+	fd_options.c_cflag &= ~( PARODD | CRTSCTS | CSTOPB | PARENB );
+        //fd_options.c_iflag |= ( );
+	fd_options.c_iflag &= ~( IUCLC | IXANY | IMAXBEL | IXON | IXOFF | IUTF8 | ICRNL | INPCK );
+	fd_options.c_oflag |= ( NL0 | CR0 | TAB0 | BS0 | VT0 | FF0 );
+	fd_options.c_oflag &= ~( OPOST | ONLCR | OLCUC | OCRNL | ONOCR | ONLRET | OFILL | OFDEL | NL1 | CR1 | CR2 | TAB3 | BS1 | VT1 | FF1 );
+	fd_options.c_lflag |= ( NOFLSH );
+	fd_options.c_lflag &= ~( ICANON | IEXTEN | TOSTOP | ISIG | ECHOPRT | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE );
+	fd_options.c_cc[VINTR] = 0x03;
+	fd_options.c_cc[VQUIT] = 0x1C;
+	fd_options.c_cc[VERASE] = 0x7F;
+	fd_options.c_cc[VKILL] = 0x15;
+	fd_options.c_cc[VEOF] = 0x04;
+	fd_options.c_cc[VTIME] = 0x01;
+	fd_options.c_cc[VMIN] = 0x00;
+	fd_options.c_cc[VSWTC] = 0x00;
+	fd_options.c_cc[VSTART] = 0x11;
+	fd_options.c_cc[VSTOP] = 0x13;
+	fd_options.c_cc[VSUSP] = 0x1A;
+	fd_options.c_cc[VEOL] = 0x00;
+	fd_options.c_cc[VREPRINT] = 0x12;
+	fd_options.c_cc[VDISCARD] = 0x0F;
+	fd_options.c_cc[VWERASE] = 0x17;
+	fd_options.c_cc[VLNEXT] = 0x16;
+	fd_options.c_cc[VEOL2] =  0x00;
+
 	if( 0 > tcsetattr( fd, TCSANOW, &fd_options ) )
 	{
 		ROS_FATAL( "Failed to set port attributes: %s", strerror( errno ) );
@@ -93,6 +129,7 @@ bool kangaroo::start( )
 		joint_state_pub = nh.advertise<sensor_msgs::JointState>( "joint_state", 2);
 
 	send_start_signals((unsigned char)128);
+
 	return true;
 }
 
@@ -146,7 +183,7 @@ void kangaroo::JointTrajCB(const trajectory_msgs::JointTrajectoryPtr &msg)
 
 	tcflush(fd, TCOFLUSH);
 
-	boost::mutex::scoped_lock io_lock(io_mutex);
+	//boost::mutex::scoped_lock io_lock(io_mutex);
 	set_channel_speed(msg->points[0].velocities[ch1_idx], 128, '1');
 	set_channel_speed(msg->points[0].velocities[ch2_idx], 128, '2');
 }
@@ -173,6 +210,14 @@ bool kangaroo::send_start_signals(unsigned char address)
 	return true;
 }
 
+void kangaroo::requestCB( const ros::WallTimerEvent &e )
+{
+	send_get_request((unsigned char)128, '1', 1);
+	send_get_request((unsigned char)128, '1', 2);
+	send_get_request((unsigned char)128, '2', 1);
+	send_get_request((unsigned char)128, '2', 2);
+}
+
 bool kangaroo::set_channel_speed(double speed, unsigned char address, char channel)
 {
 	std::cout << "Sending " << speed << " to Channel " << channel << std::endl;
@@ -181,7 +226,7 @@ bool kangaroo::set_channel_speed(double speed, unsigned char address, char chann
 		return false;
 
 	// lock the mutex, since we will be writing to the serial port
-	boost::mutex::scoped_lock(io_mutex);
+	boost::mutex::scoped_lock io_lock(io_mutex);
 
 	unsigned char buffer[18];
 
@@ -198,6 +243,7 @@ bool kangaroo::set_channel_speed(double speed, unsigned char address, char chann
 
 bool kangaroo::send_get_request(unsigned char address, char channel, unsigned char desired_parameter)
 {
+	//std::cout << "Requesting!" << std::endl;
 	if (!is_open() && !open())
 		return false;
 
@@ -210,7 +256,9 @@ bool kangaroo::send_get_request(unsigned char address, char channel, unsigned ch
 	}
 
 	// lock the mutex, since we will be writing to the serial port
-	boost::mutex::scoped_lock(io_mutex);
+	boost::mutex::scoped_lock io_lock(io_mutex);
+
+	std::cout << "Sending Request." << std::endl;
 
 	int num_of_bytes = write_kangaroo_get_command(address, channel, desired_parameter, buffer);
 	if (0 > write(fd, buffer, num_of_bytes))
@@ -219,24 +267,48 @@ bool kangaroo::send_get_request(unsigned char address, char channel, unsigned ch
 		close();
 		return false;
 	}
+	std::cout << "Request Written." << std::endl;
 
 	return true;
 }
 
 void kangaroo::read_thread()
-{
+{	
+	ROS_INFO("Starting the read thread.");
 	while (ros::ok)
 	{
-		unsigned char byte;
-		if (0 > read(fd, &byte, 1))
-			ROS_WARN("An error occurred while reading. - Main read thread.");
-		if (byte == (unsigned char)128)
-			read_message(byte);
+		try
+		{
+			boost::this_thread::interruption_point();
+			unsigned char byte = 0;
+			if (0 > read(fd, &byte, 1))
+				ROS_WARN("An error occurred while reading. - Main read thread.");
+			if (byte == (unsigned char)128)
+			{
+				bool ok_II = true;
+				unsigned char byte_II = read_one_byte(ok_II);
+				if(ok_II && ( byte_II == (unsigned char)67))
+				{
+					read_message(byte);
+				}
+			}
+			if( byte == 0)
+				continue;
+			if( byte != (unsigned char) 128)
+				ROS_WARN("Picked up something that wasn't the address." );
+		}
+		catch(boost::thread_interrupted&)
+		{
+			ROS_INFO("Stopping the read thread.");
+			return;
+		}
 	}
 }
 
 bool kangaroo::read_message(unsigned char address)
 {
+
+	ROS_INFO("Found header, and beginning to read.");
 	// note: we aren't guaranteed the exact number of bytes that the
 	//   kangaroo will respond with, so we must read the header and 
 	//   data separately
@@ -246,21 +318,25 @@ bool kangaroo::read_message(unsigned char address)
 	// 1 for parameter, 5 (max) for bit-packed value
 	unsigned char crc[2] = { 0 };		// crc is 2 bytes long
 
+	boost::mutex::scoped_lock io_lock(io_mutex);
 	header[0] = address;
-	for (size_t i = 1; i < 3; i++)
+	header[1] = (unsigned char)67;
+	std::cout << "Header: " << (int)header[0] << ", " << (int)header[1] << ", ";	
+	for (size_t i = 2; i < 3; i++)
 	{
 		header[i] = read_one_byte(one_byte_ok);
 		// bail if reading one byte fails
 		if (!one_byte_ok)
 		{
 			ROS_ERROR("Error when reading header from kangaroo.");
-			//ok = false;
 			return false;
 		}
+		std::cout << (int)header[i] << ", ";
 	}
-	std::cout << "Header: " << (int)header[0] << ", " << (int)header[1] << ", " << (int)header[2] << std::endl;
+	std::cout << std::endl;
 
 	// Read the data
+	std::cout << "DATA: ";
 	for (size_t i = 0; i < header[2]; i++)
 	{
 		data[i] = read_one_byte(one_byte_ok);
@@ -271,27 +347,36 @@ bool kangaroo::read_message(unsigned char address)
 			//ok = false;
 			return 0;
 		}
-	}
-	// print the data ( DEBUG ONLY)
-	std::cout << "Data: ";
-	for (size_t i = 0; i < header[2]; i++)
 		std::cout << (int)data[i] << ", ";
-	std::wcout << std::endl;
+	}
+	std::cout << std::endl;
 	
 	// read the error correcting code
+	std::cout << "CRC: ";
 	for (size_t i = 0; i < 2; i++)
 	{
 		crc[i] = read_one_byte(one_byte_ok);
 		// bail if reading one byte fails
 		if (!one_byte_ok)
 		{
-			ROS_ERROR("Error when reading *data* from kangaroo.");
+			ROS_ERROR("Error when reading *CRC* from kangaroo.");
 			//ok = false;
 			return 0;
 		}
+		std::cout << (int)crc[i] << ", ";
 	}
-	// Print the CRC (Debug only)
-	std::cout << "CRC: " << (int)crc[0] << ", " << (int)crc[1] << std::endl;
+	std::cout << std::endl;
+
+	//std::cout << "Header: " << (int)header[0] << ", " << (int)header[1] << ", " << (int)header[2] << std::endl;
+	//std::cout << "Data: ";
+        //for (size_t i = 0; i < header[2]; i++)
+        //        std::cout << (int)data[i] << ", ";
+        //std::cout << std::endl;
+	//// Print the CRC (Debug only)
+	//std::cout << "CRC: " << (int)crc[0] << ", " << (int)crc[1] << std::endl;
+
+	//sensor_msgs::JointStatePtr msg(new sensor_msgs::JointState);
+        //msg->name.resize(1);
 
 	bool ok = true;
 	evaluate_kangaroo_response(address, header, data, ok);
@@ -303,6 +388,26 @@ unsigned char kangaroo::read_one_byte(bool& ok)
 	unsigned char buffer;
 
 	int bits_read = read(fd, &buffer, 1);
+		
+	if (bits_read == 0)
+        {
+		// try once more to read from the serial communication
+		bits_read = read(fd, &buffer, 1);
+                if (bits_read < 0)
+                {
+                        ROS_ERROR("Reading from serial critically failed: %s", strerror(errno));
+                        close();
+                        ok = false;
+                        return 0;
+                }
+                if (bits_read == 0)
+                {
+                        ROS_ERROR("Failed to read from the serial.");
+                        ok = false;
+                        return 0;
+                }
+        }
+
 	if (bits_read > 0)
 		return buffer;
 	if (bits_read < 0)
@@ -312,43 +417,39 @@ unsigned char kangaroo::read_one_byte(bool& ok)
 		ok = false;
 		return 0;
 	}
-	
-	if (bits_read == 0)
-	{
-		// try to read the byte again if it fails
-		bits_read = read(fd, &buffer, 1);
-		if (bits_read < 0)
-		{
-			ROS_ERROR("Reading from serial critically failed: %s", strerror(errno));
-			close();
-			ok = false;
-			return 0;
-		}
-		if (bits_read == 0)
-		{
-			ROS_ERROR("Failed to read from the serial.");
-			ok = false;
-			return 0;
-		}
-	}
 
 	return buffer;
 }
 
 int kangaroo::evaluate_kangaroo_response( unsigned char address, unsigned char* header, unsigned char* data, bool& ok)
 {
-	ROS_INFO( "Evaluating the response." );
+	// p1 - position of joint 1, v1 - velocity of joint 1
+	static bool p1 = false;
+	static bool v1 = false;
+	// p2 - position of joint 2, v2 - velocity of joint 2
+	static bool p2 = false;
+	static bool v2 = false;
+
+
+
 	size_t data_size = header[2];
 	size_t value_size = data_size - 3;      // there are 3 bits that aren't the value
 	size_t value_offset = 3;	// offset of the value in data
-	//bool echo_code = false;
 
-	if( data[1] & (1 << 5 ))	// testing the flag to see if there is an echo code
+	
+	if( data[1] & (1 << 4 ))	// testing the flag to see if there is an echo code
 	{
 		value_size--;	// if there is an echo code, then there will be 1 extra byte
 		value_offset++;
 		//echo_code = true;
 		ROS_INFO("There was an echo code.");
+	}
+
+	if( data[1] & (1 << 6) )
+	{
+		value_size--;
+		value_offset++;
+		ROS_INFO("There was a sequence code.");
 	}
 
 	int value = un_bitpack_number(&data[value_offset], value_size);
@@ -363,25 +464,37 @@ int kangaroo::evaluate_kangaroo_response( unsigned char address, unsigned char* 
 	if(data[1] & (1 << 1) )
 		ROS_WARN( "The controller is in motion." );
 
-	sensor_msgs::JointStatePtr msg(new sensor_msgs::JointState);
-	msg->name.resize(1);
+	//sensor_msgs::JointStatePtr msg(new sensor_msgs::JointState);
+	//msg->name.resize(1);
+	
+	int joint_index;
 	if(data[0] == '1')
-		msg->name[0] = ch1_joint_name;
+		joint_index = 0;
 	else
-		msg->name[0] = ch2_joint_name;
+		joint_index = 1;
 
 	if(data[2] == 1)
 	{
-		msg->position.resize(1);
-		msg->position[0] = value;
+		msg->position[joint_index] = value;
+		if(data[0] == '1')
+			p1 = true;
+		else
+			p2 = true;
 	}
 	else
 	{
-		msg->velocity.resize(1);
-		msg->position[0] = value;
+		msg->velocity[joint_index] = value;
+		if(data[0] == '1')
+                        v1 = true;
+                else
+                        v2 = true;
 	}
 
-	joint_state_pub.publish(msg);
+	if( p1 && v1 && p2 && v2)
+	{
+		p1 = false; v1 = false; p2 = false; v2 = false;
+		joint_state_pub.publish(msg);
+	}
 	return value;
 }
 
@@ -409,9 +522,25 @@ void kangaroo::handle_errors(unsigned char address, int error_code)
 	case 6:
 		ROS_ERROR("Serial timeout occurred.");
 		break;
+	default:
+		ROS_ERROR("Something very very bad happened.  (ERROR)");
 	}
 	return;
 }
+
+//bool kangaroo::evaluate_crc(unsigned char address, unsigned char* header, unsigned char* data, int size_of_data, unsigned char* crc)
+//{
+//	unsigned char buffer[15];
+//	for(size_t i = 0; i < 3; i++)
+//		buffer[i] = header[i];
+//
+//	for(size_t i = 0; i < size_of_data; i++)
+//		buffer[i+3] = data[i];
+//
+//	uint16_t given_crc = crc[0] + (crc[1] << 7);
+//	uint16_t generated_crc = crc14(buffer, size_of_data + 3);
+//	return (given_crc == generated_crc);
+//}
 
 //}
 

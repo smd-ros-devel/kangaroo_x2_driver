@@ -51,13 +51,13 @@ size_t bitpackNumber(unsigned char* buffer, int number)
 	return i;
 }
 
-int un_bitpack_number(unsigned char* data, size_t num_of_bytes)
+int un_bitpack_number(uint8_t* data, size_t num_of_bytes)
 {
         int bit_packed_number = 0;
         for (size_t i = 0; i < num_of_bytes; i++)
         {
-                int temp = data[i] & 0x3f;
-                bit_packed_number += (temp << (i * 6));
+                int temp = (unsigned char)data[i] & 0x3f;
+                bit_packed_number |= (temp << (i * 6));
         }
 
         if (bit_packed_number % 2 == 1)

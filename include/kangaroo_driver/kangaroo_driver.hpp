@@ -2,6 +2,7 @@
 #define _kangaroo_hpp
 
 #include <ros/ros.h>
+#include <ros/timer.h>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <sensor_msgs/JointState.h>
 #include <stdint.h>
@@ -24,10 +25,15 @@ public:
 	// continually reads from the serial port.  Meant to be called as a thread
 	void read_thread();
 
+	void requestCB( const ros::WallTimerEvent &e );
+
+	sensor_msgs::JointStatePtr msg;
+
 private:
 	bool is_open( ) const;
 	void JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg );
 
+	//bool read_message_debug(unsigned char address);
 	// functions for sending information to the kangaroo
 	bool send_get_request(unsigned char address, char channel, unsigned char desired_parameter);
 	bool set_channel_speed(double speed, unsigned char address, char channel);
@@ -47,14 +53,18 @@ private:
 	// file descriptor, which is used for accessing serial ports in C.
 	//   it's essentially an address to the serial port
 	int fd;
-
+	int request_written;
 	// Node handles
 	ros::NodeHandle nh;
 	ros::NodeHandle nh_priv;
+	ros::WallTimer poll_timer;
 	ros::Subscriber joint_traj_sub;
 	ros::Publisher joint_state_pub;
 	// mutex that is used for allowing only one message to be sent at a time
 	boost::mutex io_mutex;
+
+	//Joint State pointer, used to publish a joint state message
+	//sensor_msgs::JointStatePtr msg;
 
 	//int read_from_serial(uint8_t address, char channel, bool& ok);
 	//int get_speed( uint8_t address, char channel, bool& ok );
