@@ -36,13 +36,17 @@ private:
 
 	// functions used for the request - response  (JointStateCB)
 	int get_parameter(unsigned char address, char channel, unsigned char desired_parameter);
-	bool read_message(unsigned char address, bool& ok);
+	int read_message(unsigned char address, bool& ok);
 	uint8_t read_one_byte(bool& ok);
 	int evaluate_kangaroo_response( uint8_t address, uint8_t* header, uint8_t* data, bool& ok);
 	void handle_errors(uint8_t address, int error_code);
 
 	// address of the serial port
 	std::string port;
+	// the number of lines of the encoder
+	int encoder_lines_per_revolution;
+	double diameter_of_wheels;
+	double circumference_of_wheels;
 	// the joints names for the two motors
 	std::string ch1_joint_name;
 	std::string ch2_joint_name;
@@ -58,7 +62,7 @@ private:
 	
 	// mutex-es for accessing the serial that the kangaroo is connected on
 	// output_mutex *must* be locked first
-	boost::mutex ouput_mutex;
+	boost::mutex output_mutex;
 	boost::mutex input_mutex;
 
 	//Joint State pointer, used to publish a joint state message

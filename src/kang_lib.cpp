@@ -156,7 +156,7 @@ size_t write_kangaroo_get_command(unsigned char address, char channel, char para
 	unsigned char data[3];
 	size_t length = 0;
 	data[length++] = (unsigned char)channel;
-	data[length++] = 0;
+	data[length++] = 32;
 	data[length++] = parameter;
 	return write_kangaroo_command(address, 35, data, length, buffer);
 }

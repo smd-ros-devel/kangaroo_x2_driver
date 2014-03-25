@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <string>
+#include <cmath>
 
 //namespace kangaroo
 //{
@@ -20,7 +21,9 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	ch2_joint_name( "2" ),
 	fd( -1 ),
 	nh( _nh ),
-	nh_priv( _nh_priv )
+	nh_priv( _nh_priv ),
+	encoder_lines_per_revolution(3200),
+	diameter_of_wheels(.117475)
 	//msg(new sensor_msgs::JointState)
 {
 	ROS_INFO( "Initializing" );
@@ -28,7 +31,9 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	nh_priv.param( "ch1_joint_name", ch1_joint_name, (std::string)"1" );
 	nh_priv.param( "ch2_joint_name", ch2_joint_name, (std::string)"2" );
 
-	poll_timer = nh.createWallTimer( ros::WallDuration(0.05), &kangaroo::JointStateCB, this );
+	poll_timer = nh.createWallTimer( ros::WallDuration(0.02), &kangaroo::JointStateCB, this );
+
+	//circumference_of_wheels = diameter_of_wheels * PI;
 }
 
 bool kangaroo::open()
@@ -122,6 +127,7 @@ bool kangaroo::start( )
 
 	send_start_signals((unsigned char)128);
 
+	ROS_INFO("...Done!");
 	return true;
 }
 
@@ -171,7 +177,7 @@ void kangaroo::JointTrajCB(const trajectory_msgs::JointTrajectoryPtr &msg)
 		return;
 	}
 
-	ROS_WARN("Got a valid JointTrajectory message");
+	//ROS_WARN("Got a valid JointTrajectory message");
 
 	tcflush(fd, TCOFLUSH);
 
@@ -208,7 +214,7 @@ bool kangaroo::send_start_signals(unsigned char address)
 // sends the kangaroo a speed command for the given channel at the given address
 bool kangaroo::set_channel_speed(double speed, unsigned char address, char channel)
 {
-	std::cout << "Sending " << speed << " to Channel " << channel << std::endl;
+	//std::cout << "Sending " << speed << " to Channel " << channel << std::endl;
 
 	if (!is_open() && !open())
 		return false;
@@ -248,7 +254,7 @@ void kangaroo::JointStateCB( const ros::WallTimerEvent &e )
 	}
 	catch (std::string s)
 	{
-		ROS_ERROR(s);
+		ROS_ERROR(s.c_str());
 		return;
 	}
 }
@@ -306,7 +312,13 @@ bool kangaroo::send_get_request(unsigned char address, char channel, unsigned ch
 // bool& ok is used to indicate if the reading failed or succeeded
 int kangaroo::read_message(unsigned char address, bool& ok)
 {
-	ROS_INFO("Found header, and beginning to read.");
+	if(!is_open() && !open())
+	{
+		ROS_ERROR("Serial is not open.");
+		ok = false;
+		return 0;
+	}
+	//ROS_INFO("Found header, and beginning to read.");
 	// note: we aren't guaranteed the exact number of bytes that the
 	//   kangaroo will respond with, so we must read the header and 
 	//   data separately
@@ -316,7 +328,7 @@ int kangaroo::read_message(unsigned char address, bool& ok)
 	unsigned char crc[2] = { 0 };		// crc is 2 bytes long
 
 
-	std::cout << "Header: ";
+	//std::cout << "Header: ";
 	for (size_t i = 0; i < 3; i++)
 	{
 		header[i] = read_one_byte(ok);
@@ -326,12 +338,12 @@ int kangaroo::read_message(unsigned char address, bool& ok)
 			ROS_ERROR("Failed to get the header.");
 			return 0;
 		}
-		std::cout << (int)header[i] << ", ";
+		//std::cout << (int)header[i] << ", ";
 	}
-	std::cout << std::endl;
+	//std::cout << std::endl;
 
 	// Read the data
-	std::cout << "DATA: ";
+	//std::cout << "DATA: ";
 	for (size_t i = 0; i < header[2]; i++)
 	{
 		data[i] = read_one_byte(ok);
@@ -341,12 +353,12 @@ int kangaroo::read_message(unsigned char address, bool& ok)
 			ROS_ERROR("Failed to get the Data.");
 			return 0;
 		}
-		std::cout << (int)data[i] << ", ";
+		//std::cout << (int)data[i] << ", ";
 	}
-	std::cout << std::endl;
+	//std::cout << std::endl;
 	
 	// read the error correcting code
-	std::cout << "CRC: ";
+	//std::cout << "CRC: ";
 	for (size_t i = 0; i < 2; i++)
 	{
 		crc[i] = read_one_byte(ok);
@@ -356,9 +368,9 @@ int kangaroo::read_message(unsigned char address, bool& ok)
 			ROS_ERROR("Failed to get the CRC.");
 			return 0;
 		}
-		std::cout << (int)crc[i] << ", ";
+		//std::cout << (int)crc[i] << ", ";
 	}
-	std::cout << std::endl;
+	//std::cout << std::endl;
 
 	// note: evaluate_kangaroo_response will modify "ok" if something bad happens.
 	return evaluate_kangaroo_response(address, header, data, ok);
@@ -371,7 +383,9 @@ int kangaroo::evaluate_kangaroo_response( unsigned char address, unsigned char* 
 	size_t value_offset = 3;	// offset of the value in data
 
 	if (data[1] & (1 << 1))
-		ROS_WARN("The joints are under acceleration.");
+	{
+		//ROS_INFO("The joint is under acceleration.");
+	}
 
 	if( data[1] & (1 << 4 ))	// testing the flag to see if there is an echo code
 	{
@@ -389,7 +403,7 @@ int kangaroo::evaluate_kangaroo_response( unsigned char address, unsigned char* 
 	}
 
 	int value = un_bitpack_number(&data[value_offset], value_size);
-	std::cout << "The value is: " << value << std::endl;
+	//std::cout << "The value is: " << value << std::endl;
 	if( data[1] & 1 )	// testing the flag to see if there is an error
 	{
 		handle_errors(address, value);
@@ -399,6 +413,26 @@ int kangaroo::evaluate_kangaroo_response( unsigned char address, unsigned char* 
 
 	return value;
 }
+
+//double kangaroo::encoder_lines_to_radians( int encoder_lines  )
+//{
+	
+//}
+
+//double kangaroo::encoder_lines_to_meters( int encoder_lines )
+//{
+
+//}
+
+//int kangaroo::radians_to_encoder_lines( double radians )
+//{
+
+//}
+
+//int kangaroo::meters_to_encoder_lines( double meters )
+//{
+
+//}
 
 unsigned char kangaroo::read_one_byte(bool& ok)
 {
