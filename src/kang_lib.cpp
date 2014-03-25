@@ -132,7 +132,7 @@ size_t write_kangaroo_speed_command(unsigned char address, char channel, int spe
 	size_t length = 0;
 	data[length] = (unsigned char)channel;
 	length++;
-	data[length] = 0;  // move flags
+	data[length] = 32;  // move flags
 	length++;
 	data[length] = 2;  // Speed
 	length++;

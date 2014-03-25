@@ -65,14 +65,11 @@ private:
 	boost::mutex output_mutex;
 	boost::mutex input_mutex;
 
-	//Joint State pointer, used to publish a joint state message
-	//sensor_msgs::JointStatePtr msg;
-
-	//int read_from_serial(uint8_t address, char channel, bool& ok);
-	//int get_speed( uint8_t address, char channel, bool& ok );
-	//int get_position( unsigned char address, char channel, bool& ok );
-	//void poll_kangaroo( unsigned char address );
-	//int read_from_serial(uint8_t address, char channel, bool& ok);
+	// unit conversion
+	double encoder_lines_to_radians( int encoder_lines );
+	double encoder_lines_to_meters( int encoder_lines );
+	int radians_to_encoder_lines( double radians );
+	int meters_to_encoder_lines( double meters );
 };
 
 //}
