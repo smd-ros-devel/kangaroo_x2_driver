@@ -22,7 +22,8 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	fd( -1 ),
 	nh( _nh ),
 	nh_priv( _nh_priv ),
-	encoder_lines_per_revolution(3200)
+	encoder_lines_per_revolution(3200),
+	hz(50)
 	//diameter_of_wheels(.117475)
 	//msg(new sensor_msgs::JointState)
 {
@@ -31,7 +32,10 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	nh_priv.param( "ch1_joint_name", ch1_joint_name, (std::string)"1" );
 	nh_priv.param( "ch2_joint_name", ch2_joint_name, (std::string)"2" );
 
-	poll_timer = nh.createWallTimer( ros::WallDuration(0.02), &kangaroo::JointStateCB, this );
+	// the rate we want to set the timer at
+	double rate = (double)1/(double)hz;
+
+	poll_timer = nh.createWallTimer( ros::WallDuration(rate), &kangaroo::JointStateCB, this );
 
 	//circumference_of_wheels = diameter_of_wheels * M_PI;
 }
@@ -248,6 +252,7 @@ void kangaroo::JointStateCB( const ros::WallTimerEvent &e )
 		msg->name[1] = ch2_joint_name;
 		msg->position.resize(2);
 		msg->velocity.resize(2);
+		msg->header.stamp = ros::Time::now();
 
 		// get_position and get_velocity might throw an exception if either
 		//   request or the read fails

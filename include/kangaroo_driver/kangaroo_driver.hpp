@@ -28,7 +28,6 @@ private:
 	bool is_open( ) const;
 	void JointTrajCB( const trajectory_msgs::JointTrajectoryPtr &msg );
 
-	//bool read_message_debug(unsigned char address);
 	// functions for sending information to the kangaroo
 	bool send_get_request(unsigned char address, char channel, unsigned char desired_parameter);
 	bool set_channel_speed(double speed, unsigned char address, char channel);
@@ -45,11 +44,12 @@ private:
 	std::string port;
 	// the number of lines of the encoder
 	int encoder_lines_per_revolution;
-	//double diameter_of_wheels;
-	//double circumference_of_wheels;
+	// the hertz that the JointState will be published at
+	int hz;
 	// the joints names for the two motors
 	std::string ch1_joint_name;
 	std::string ch2_joint_name;
+
 	// file descriptor, which is used for accessing serial ports in C.
 	//   it's essentially an address to the serial port
 	int fd;
@@ -67,9 +67,7 @@ private:
 
 	// unit conversion
 	double encoder_lines_to_radians( int encoder_lines );
-	//double encoder_lines_to_meters( int encoder_lines );
 	int radians_to_encoder_lines( double radians );
-	//int meters_to_encoder_lines( double meters );
 };
 
 //}
