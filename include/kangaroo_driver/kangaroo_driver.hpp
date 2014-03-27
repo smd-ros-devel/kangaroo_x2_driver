@@ -45,8 +45,8 @@ private:
 	std::string port;
 	// the number of lines of the encoder
 	int encoder_lines_per_revolution;
-	double diameter_of_wheels;
-	double circumference_of_wheels;
+	//double diameter_of_wheels;
+	//double circumference_of_wheels;
 	// the joints names for the two motors
 	std::string ch1_joint_name;
 	std::string ch2_joint_name;
@@ -67,9 +67,9 @@ private:
 
 	// unit conversion
 	double encoder_lines_to_radians( int encoder_lines );
-	double encoder_lines_to_meters( int encoder_lines );
+	//double encoder_lines_to_meters( int encoder_lines );
 	int radians_to_encoder_lines( double radians );
-	int meters_to_encoder_lines( double meters );
+	//int meters_to_encoder_lines( double meters );
 };
 
 //}

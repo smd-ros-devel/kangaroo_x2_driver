@@ -22,8 +22,8 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 	fd( -1 ),
 	nh( _nh ),
 	nh_priv( _nh_priv ),
-	encoder_lines_per_revolution(3200),
-	diameter_of_wheels(.117475)
+	encoder_lines_per_revolution(3200)
+	//diameter_of_wheels(.117475)
 	//msg(new sensor_msgs::JointState)
 {
 	ROS_INFO( "Initializing" );
@@ -33,7 +33,7 @@ kangaroo::kangaroo( ros::NodeHandle &_nh, ros::NodeHandle &_nh_priv ) :
 
 	poll_timer = nh.createWallTimer( ros::WallDuration(0.02), &kangaroo::JointStateCB, this );
 
-	circumference_of_wheels = diameter_of_wheels * M_PI;
+	//circumference_of_wheels = diameter_of_wheels * M_PI;
 }
 
 bool kangaroo::open()
@@ -256,9 +256,9 @@ void kangaroo::JointStateCB( const ros::WallTimerEvent &e )
 		msg->position[1] = get_parameter((unsigned char)128, '2', (unsigned char)1);	// position for ch2
 		msg->velocity[1] = get_parameter((unsigned char)128, '2', (unsigned char)2);	// velocity for ch2
 
-		msg->position[0] = encoder_lines_to_meters(msg->position[0]);
+		msg->position[0] = encoder_lines_to_radians(msg->position[0]);
 		msg->velocity[0] = encoder_lines_to_radians(msg->velocity[0]);
-		msg->position[1] = encoder_lines_to_meters(msg->position[1]);
+		msg->position[1] = encoder_lines_to_radians(msg->position[1]);
 		msg->velocity[1] = encoder_lines_to_radians(msg->velocity[1]);
 
 		joint_state_pub.publish(msg);
@@ -430,20 +430,20 @@ inline double kangaroo::encoder_lines_to_radians( int encoder_lines  )
 	return (encoder_lines * 2 * M_PI / encoder_lines_per_revolution);
 }
 
-inline double kangaroo::encoder_lines_to_meters( int encoder_lines )
-{
- 	return (encoder_lines * circumference_of_wheels / encoder_lines_per_revolution);
-}
+//inline double kangaroo::encoder_lines_to_meters( int encoder_lines )
+//{
+// 	return (encoder_lines * circumference_of_wheels / encoder_lines_per_revolution);
+//}
 
 inline int kangaroo::radians_to_encoder_lines( double radians )
 {
 	return (radians * encoder_lines_per_revolution / ( 2 * M_PI ));
 }
 
-inline int kangaroo::meters_to_encoder_lines( double meters )
-{
-	return (meters * encoder_lines_per_revolution / circumference_of_wheels);
-}
+//inline int kangaroo::meters_to_encoder_lines( double meters )
+//{
+//	return (meters * encoder_lines_per_revolution / circumference_of_wheels);
+//}
 
 unsigned char kangaroo::read_one_byte(bool& ok)
 {
