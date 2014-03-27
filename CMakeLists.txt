@@ -6,14 +6,12 @@ project(kangaroo_driver)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  rospy
   std_msgs
   trajectory_msgs
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -82,8 +80,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-#  LIBRARIES robot_test
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+#  LIBRARIES kang_lib
+#  CATKIN_DEPENDS roscpp std_msgs trajectory_msgs
 #  DEPENDS system_lib
 )
 
@@ -93,18 +91,16 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-# include_directories(include)
-include_directories( include
+include_directories(include
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a cpp library
-add_library( kang_lib
+add_library(kang_lib
   src/kang_lib.cpp
 )
 
 ## Declare a cpp executable
-# add_executable(robot_test_node src/robot_test_node.cpp )
 add_executable(kangaroo_driver_node src/kangaroo_driver_node.cpp src/kangaroo_driver.cpp)
 
 ## Add cmake target dependencies of the executable/library
@@ -131,11 +127,10 @@ target_link_libraries(kangaroo_driver_node kang_lib
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS robot_test robot_test_node
-install(TARGETS kangaroo_driver_node
-   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+install(TARGETS kangaroo_driver_node kang_lib
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## Mark cpp header files for installation
