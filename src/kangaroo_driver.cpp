@@ -319,6 +319,8 @@ bool kangaroo::send_get_request(unsigned char address, char channel, unsigned ch
 	if (0 > write(fd, buffer, num_of_bytes))
 	{
 		ROS_ERROR("Failed to write to serial.");
+		close();
+		fd = -1;
 		return false;
 	}
 
@@ -510,6 +512,7 @@ void kangaroo::handle_errors(unsigned char address, int error_code)
 		ROS_ERROR("The given parameter is unknown.");
 		break;
 	case 6:
+		send_start_signals(address);
 		ROS_ERROR("Serial timeout occurred.");
 		break;
 	default:
